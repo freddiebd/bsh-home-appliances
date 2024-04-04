@@ -5,6 +5,10 @@ esphome:
 esp32:
   board: esp32-c6-devkitc-1
   variant: esp32c6
+  framework:
+    type: esp-idf
+    version: 5.1.2
+    platform_version: 6.5.0
 
 # Enable logging
   logger:
@@ -79,26 +83,26 @@ uart:
 
             switch (framedata[1] << 16 | framedata[2] << 8 | framedata[3]) {
               case 0x111006:
-                #Drying Program Output to Sensor
+                // Drying Program
                 id(bsh_dryer_program).publish_state(framedata[6]);
-                #Feature Bits Temperature/Dryness
+                // Features eg. Low Heat/Dryness Setting
                 id(bsh_dryer_feat_low_heat).publish_state((framedata[10]);
                 id(bsh_dryer_feat_fine_adjust).publish_state((framedata[8]);     
                 break;
               case 0x111001:
-                #Start/Pause Button Output
+                // Start/Pause Button Output
                 id(bsh_dryer_start_pause_button).publish_state((framedata[4]);
                 break;
               case 0x211000:
-                #Dryer Status 'Running'/'Finished'
+                // Dryer Status Running/Finished
                 id(bsh_dryer_status).publish_state((framedata[4]);
-                #Dryer Door Status
+                // Dryer Door Status
                 id(bsh_dryer_door).publish_state((framedata[5]);
                 break;
               case 0x211002:
-                #Dryer Status 'Paused'/'Interrupted'
+                // Dryer Status Paused/Interrupted
                 id(bsh_dryer_status).publish_state((framedata[4]);
-                #Dryer Time Remaining
+                // Dryer Time Remaining
                 id(bsh_dryer_time_remaining).publish_state(framedata[4]);         
                 break;
             }
@@ -109,7 +113,7 @@ uart:
 switch:
   - platform: template
     id: bsh_dryer_log
-    name: "Diagnostic Logger - Log all frames"
+    name: Diagnostic Logger - Log all frames
     optimistic: true
     icon: mdi:expand-all
     entity_category: config
