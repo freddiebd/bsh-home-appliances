@@ -181,7 +181,7 @@ text_sensor:
       - map:
         - 46 -> Running
         - 17 -> Finished
-        - 0 -> Paused/Interrupted
+        - 78 -> Paused/Interrupted
 
   - platform: template
     id: bsh_dryer_door
