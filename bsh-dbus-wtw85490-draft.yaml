@@ -1,0 +1,209 @@
+esphome:
+  name: bsh-dryer
+  friendly_name: Dryer
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+
+# Enable logging
+  logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "###"
+
+ota:
+  password: "###"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "BSH Dryer Fallback Hotspot"
+    password: "###"
+
+captive_portal:
+
+uart:
+  id: dbus_uart
+  rx_pin: 10
+  baud_rate: 9600
+  debug:
+    direction: RX
+    dummy_receiver: true
+    after:
+      timeout: 20ms
+    sequence:
+      - lambda: |-
+          // UARTDebug::log_hex(direction, bytes, ' ');
+          for (unsigned int i = 0; i < bytes.size(); ) {
+            byte* framedata = bytes.data() + i;
+            unsigned int framelen = 4 + framedata[0];
+            if ((framelen < 6) || (framelen > (bytes.size() - i)) || esphome::crc16be(framedata, framelen, 0x0, 0x1021, false, false)) {
+              if (id(bsh_dryer_log).state) {
+                ESP_LOGD("D-Bus", "Ignoring byte at %2d with value %02X", i, framedata[0]);
+              }
+              i++;
+              continue;
+            }
+ 
+            unsigned int ack = 0;
+            std::string res;
+            char buf[5];
+            for (unsigned int j = 0; j < framelen; j++) {
+              sprintf(buf, "%02X", framedata[j]);
+              res += buf;
+              if (j == (framelen - 3)) {
+                for (unsigned int p = framelen; p < 9; p++) { res += "   "; }
+              }
+              if ((j == 0) || (j == 3) || (j == (framelen - 3))) { res += " | "; }
+              else if (j == 1) { res += "."; }
+              else if (j == 2) { res += "-"; }
+              else { res += " "; }
+            }
+            res += "(crc=ok) ";
+            if (((i + framelen) < bytes.size()) && (framedata[framelen] == ((framedata[1] & 0xF0) | 0x0A))) {
+              res += "| ";
+              sprintf(buf, "%02X", framedata[framelen]);
+              res += buf;
+              res += " (ack=ok)";
+              ack = 1;
+            }
+            if (id(bsh_dryer_log).state || (((framedata[1] & 0x0F) != 0x0F) && (framedata[1] != 0x17))) {  // filter out noise
+              ESP_LOGD("D-Bus", "Frame at %2d with length %2d: %s", i, framelen, res.c_str());
+            }
+
+            switch (framedata[1] << 16 | framedata[2] << 8 | framedata[3]) {
+              case 0x111006:
+                #Drying Program Output to Sensor
+                id(bsh_dryer_program).publish_state(framedata[6]);
+                #Feature Bits Temperature/Dryness
+                id(bsh_dryer_feat_low_heat).publish_state((framedata[10]);
+                id(bsh_dryer_feat_fine_adjust).publish_state((framedata[8]);     
+                break;
+              case 0x111001:
+                #Start/Pause Button Output
+                id(bsh_dryer_start_pause_button).publish_state((framedata[4]);
+                break;
+              case 0x211000:
+                #Dryer Status 'Running'/'Finished'
+                id(bsh_dryer_status).publish_state((framedata[4]);
+                #Dryer Door Status
+                id(bsh_dryer_door).publish_state((framedata[5]);
+                break;
+              case 0x211002:
+                #Dryer Status 'Paused'/'Interrupted'
+                id(bsh_dryer_status).publish_state((framedata[4]);
+                #Dryer Time Remaining
+                id(bsh_dryer_time_remaining).publish_state(framedata[4]);         
+                break;
+            }
+
+            i += (framelen + ack);
+          }
+
+switch:
+  - platform: template
+    id: bsh_dryer_log
+    name: "Diagnostic Logger - Log all frames"
+    optimistic: true
+    icon: mdi:expand-all
+    entity_category: config
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: template
+    id: bsh_dryer_time_remaining
+    name: Time Remaining
+    icon: mdi:clock-outline
+    device_class: duration
+    state_class: measurement
+    unit_of_measurement: min
+    accuracy_decimals: 0
+    lambda: |-
+      if (id(bsh_dryer_status).state === "Running") {
+      return id(bsh_dryer_time_remaining).state;
+      } else {
+      return "Idle";
+      }
+
+text_sensor:
+  - platform: template
+    id: bsh_dryer_program
+    name: Drying Program
+    icon: mdi:tshirt-crew-outline
+    filters:
+      - map:
+        - 1 -> Cotton Cupboard Dry Plus
+        - 2 -> Cotton Cupboard Dry
+        - 3 -> Cotton Iron Dry
+        - 4 -> Sportswear
+        - 5 -> Towels
+        - 6 -> Mixed Load
+        - 7 -> Timed Dry Warm
+        - 8 -> Timed Dry Cold
+        - 9 -> Wool Finish
+        - 10 -> Down Wear
+        - 11 -> Quick Dry
+        - 12 -> Shirts
+        - 13 -> Easy Care Iron Dry
+        - 14 -> Easy Care Cupboard Dry
+        - 15 -> Easy Care Cupboard Dry Plus
+
+  - platform: template
+    id: bsh_dryer_start_pause_button
+    name: Start/Pause Button
+    icon: mdi:button-pointer
+    filters:
+      - map:
+        - 23 -> Start Pressed
+        - 01 -> Start Successful
+        - 03 -> Pause Pressed
+    on_value:
+    - delay: 2s
+    - text_sensor.template.publish:
+        id: bsh_dryer_start_pause_button
+        state: Not Pressed
+
+  - platform: template
+    id: bsh_dryer_status
+    name: Dryer Status
+    icon: mdi:washing-machine
+    filters:
+      - map:
+        - 46 -> Running
+        - 17 -> Finished
+        - 0 -> Paused/Interrupted
+
+  - platform: template
+    id: bsh_dryer_door
+    name: Door
+    icon: mdi:door
+    filters:
+      - map:
+        - 3 -> Open
+        - 6 -> Closed
+
+  - platform: template
+    id: bsh_dryer_feat_low_heat
+    name: Low Heat
+    icon: mdi:thermometer-low
+    filters:
+      - map:
+        - 0 -> Off
+        - 4 -> On
+
+  - platform: template
+    id: bsh_dryer_feat_fine_adjust
+    name: Fine Adjust
+    icon: mdi:white-balance-sunny
+    filters:
+      - map:
+        - 6 -> Off
+        - 8 -> Low+
+        - 10 -> Med++
+        - 12 -> High+++
