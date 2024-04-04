@@ -101,7 +101,7 @@ uart:
                 break;
               case 0x211002:
                 // Dryer Status Paused/Interrupted
-                id(bsh_dryer_status).publish_state((framedata[4]);
+                id(bsh_dryer_status).publish_state((framedata[5]);
                 // Dryer Time Remaining
                 id(bsh_dryer_time_remaining).publish_state(framedata[4]);         
                 break;
