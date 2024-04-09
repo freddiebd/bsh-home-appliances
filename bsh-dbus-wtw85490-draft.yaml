@@ -132,7 +132,7 @@ uart:
                   
                   std::map<int, std::string> DryerStatusMap = { 
                       {46, "Running"},
-                      // There are some other status available, need to explore.
+                      // There are probably some other status available, eg Empty lint filter warning.
                   };
                   auto status_it = DryerStatusMap.find(framedata[4]);
                   if (status_it != DryerStatusMap.end()) {
@@ -142,8 +142,9 @@ uart:
               }
               case 0x111001: {
                   if (framedata[4] == 0x23 && framedata[5] == 0x00) {
-                      //Publish "Pressed" state to the sensor
                       id(bsh_dryer_start_button).publish_state("Pressed");
+                      delay(4000); // Delay 4 seconds
+                      id(bsh_dryer_start_button).publish_state("Not Pressed");
                   }
 
                   std::map<int, std::string> DryerReadyMap = {
@@ -204,19 +205,9 @@ text_sensor:
     icon: mdi:tshirt-crew-outline
 
   - platform: template
-    id: bsh_dryer_start_button
-    name: Start Button
-    icon: mdi:button-pointer
-    on_value:
-    - delay: 4s
-    - text_sensor.template.publish:
-        id: bsh_dryer_start_button
-        state: Not Pressed
-
-  - platform: template
     id: bsh_dryer_status
     name: Dryer Status
-    icon: mdi:washing-machine
+    icon: mdi:tumble-dryer
 
   - platform: template
     id: bsh_dryer_door
@@ -227,6 +218,11 @@ text_sensor:
     id: bsh_dryer_low_heat
     name: Low Heat
     icon: mdi:thermometer-low
+
+  - platform: template
+    id: bsh_dryer_start_button
+    name: Start Button
+    icon: mdi:button-pointer
 
   - platform: template
     id: bsh_dryer_fine_adjust
