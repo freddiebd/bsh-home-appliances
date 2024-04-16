@@ -110,14 +110,7 @@ uart:
                       id(bsh_dryer_fine_adjust).publish_state(FineAdjust_it->second);
                   }
 
-                  std::map<int, std::string> LowHeatMap = {
-                      {0, "Off"},
-                      {4, "On"},
-                  };
-                  auto LowHeat_it = LowHeatMap.find(framedata[10]);
-                  if (LowHeat_it != LowHeatMap.end()) {
-                      id(bsh_dryer_low_heat).publish_state(LowHeat_it->second);
-                  }
+                  id(bsh_dryer_low_heat).publish_state(framedata[10] == 0x04);
                   break;
               }
               case 0x211000: {
@@ -198,6 +191,12 @@ sensor:
     unit_of_measurement: min
     accuracy_decimals: 0
 
+binary_sensor:
+  - platform: template
+    id: bsh_dryer_low_heat
+    name: Low Heat
+    icon: mdi:thermometer-low
+
 text_sensor:
   - platform: template
     id: bsh_dryer_program
@@ -213,11 +212,6 @@ text_sensor:
     id: bsh_dryer_door
     name: Door
     icon: mdi:door
-
-  - platform: template
-    id: bsh_dryer_low_heat
-    name: Low Heat
-    icon: mdi:thermometer-low
 
   - platform: template
     id: bsh_dryer_start_button
